@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diatom Adventure</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .scene {
+    position: fixed;
+    inset: 0;
+    display: none;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .scene.active { display: block; }
+
+  .scene img {
+    position: absolute;
+    display: block;
+    -webkit-user-drag: none;
+  }
+  .hidden { display: none !important; }
+
+  /* ---------- Scene 1 ---------- */
+  #scene1 {
+    background: url("assets/inside-scene.jpg") center / cover no-repeat;
+  }
+
+  /* Wrapper holds the guy (and the hat above him). The wrapper is what gets
+     dragged; the images inside it do the bobbing. */
+  #guy-wrap {
+    position: absolute;
+    left: 5vw;
+    bottom: 4vh;
+    width: 55vh;
+    height: 55vh;
+    z-index: 2;
+    touch-action: none;
+  }
+  #guy-wrap img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  #guy-wrap.draggable { cursor: grab; }
+  #guy-wrap.dragging  { cursor: grabbing; z-index: 5; }
+  #guy-wrap.dragging img { animation-play-state: paused; }
+
+  #hat {
+    position: absolute;
+    left: 20%;
+    bottom: 82%;
+    width: 60%;
+    height: auto;
+    cursor: pointer;
+    z-index: 3;
+    animation: bob 1.6s ease-in-out infinite;
+  }
+
+  #door {
+    right: 8vw;
+    bottom: 4vh;
+    height: 60vh;
+    z-index: 1;
+  }
+  #door.highlight { filter: drop-shadow(0 0 2vh #fff6b0); }
+
+  /* ---------- Scene 2 ---------- */
+  #scene2 { background: #000; }
+
+  #house {
+    left: 5vw;
+    bottom: 5vh;
+    height: 80vh;
+    z-index: 1;
+  }
+  #guy2 {
+    left: 8vw;
+    bottom: 3vh;
+    height: 35vh;
+    z-index: 2;
+  }
+  #car {
+    left: 50%;
+    bottom: 2vh;
+    width: min(40vw, 70vh);
+    transform: translateX(-50%);
+    cursor: pointer;
+    z-index: 3;
+  }
+  #car.shaking {
+    cursor: default;
+    animation: shake 0.12s linear infinite;
+  }
+  #car.driving {
+    cursor: default;
+    transition: left 1.6s ease-in;
+    left: 150vw;
+  }
+
+  /* ---------- Animations ---------- */
+  .bobbing { animation: bob 1.6s ease-in-out infinite; }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-1.5vh); }
+  }
+
+  @keyframes shake {
+    0%   { transform: translateX(-50%) translate(0, 0)       rotate(0deg); }
+    25%  { transform: translateX(-50%) translate(-3px, 1px)  rotate(-0.6deg); }
+    50%  { transform: translateX(-50%) translate(2px, -1px)  rotate(0.5deg); }
+    75%  { transform: translateX(-50%) translate(-2px, -1px) rotate(-0.4deg); }
+    100% { transform: translateX(-50%) translate(0, 0)       rotate(0deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #hat, .bobbing, #car.shaking { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<section id="scene1" class="scene active">
+  <img id="door" class="hidden" src="assets/door.png" alt="Door">
+  <div id="guy-wrap">
+    <img id="guy" src="assets/diatom-guy.png" alt="Diatom guy">
+    <img id="hat" src="assets/hat.png" alt="Hat">
+  </div>
+</section>
+
+<section id="scene2" class="scene">
+  <img id="house" src="assets/house.png" alt="House">
+  <img id="guy2" src="assets/diatom-guy-with-hat.png" alt="Diatom guy with hat">
+  <img id="car" src="assets/car.png" alt="Car">
+</section>
+
+<script>
+  // Preload swap images so changes don't flicker.
+  ["assets/diatom-guy-with-hat.png", "assets/car-with-driver.png"].forEach(src => {
+    new Image().src = src;
+  });
+
+  const scene1  = document.getElementById("scene1");
+  const scene2  = document.getElementById("scene2");
+  const guyWrap = document.getElementById("guy-wrap");
+  const guy     = document.getElementById("guy");
+  const hat     = document.getElementById("hat");
+  const door    = document.getElementById("door");
+  const guy2    = document.getElementById("guy2");
+  const car     = document.getElementById("car");
+
+  // ----- Scene 1: put on the hat -----
+  hat.addEventListener("click", () => {
+    guy.src = "assets/diatom-guy-with-hat.png";
+    hat.classList.add("hidden");
+    door.classList.remove("hidden");
+    guy.classList.add("bobbing");
+    guyWrap.classList.add("draggable");
+  });
+
+  // ----- Scene 1: drag the guy to the door -----
+  let drag = null;
+
+  function overlapsDoor() {
+    const g = guy.getBoundingClientRect();
+    const d = door.getBoundingClientRect();
+    // Use the centre of the guy so a slight touch of the edge doesn't count.
+    const cx = g.left + g.width / 2;
+    const cy = g.top + g.height / 2;
+    return cx > d.left && cx < d.right && cy > d.top && cy < d.bottom;
+  }
+
+  guyWrap.addEventListener("pointerdown", e => {
+    if (!guyWrap.classList.contains("draggable")) return;
+    e.preventDefault();
+    guyWrap.setPointerCapture(e.pointerId);
+    drag = { startX: e.clientX, startY: e.clientY };
+    guyWrap.classList.add("dragging");
+  });
+
+  guyWrap.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    guyWrap.style.transform = `translate(${dx}px, ${dy}px)`;
+    door.classList.toggle("highlight", overlapsDoor());
+  });
+
+  function endDrag() {
+    if (!drag) return;
+    drag = null;
+    guyWrap.classList.remove("dragging");
+    door.classList.remove("highlight");
+    if (overlapsDoor()) {
+      startScene2();
+    } else {
+      guyWrap.style.transform = "";  // snap back
+    }
+  }
+  guyWrap.addEventListener("pointerup", endDrag);
+  guyWrap.addEventListener("pointercancel", endDrag);
+
+  // ----- Scene 2 -----
+  function startScene2() {
+    scene1.classList.remove("active");
+    scene2.classList.add("active");
+  }
+
+  let carClicked = false;
+  car.addEventListener("click", () => {
+    if (carClicked) return;
+    carClicked = true;
+    guy2.classList.add("hidden");
+    car.src = "assets/car-with-driver.png";
+    car.classList.add("shaking");
+    setTimeout(() => {
+      car.classList.remove("shaking");
+      car.classList.add("driving");
+    }, 1000);
+  });
+</script>
+</body>
+</html>
